@@ -22,9 +22,10 @@ describe("fontes de tab por link", () => {
 
   it("extrai a tab do Cifra Club", () => {
     const html = `<html><head><title>Emergency - Paramore - Cifra Club</title></head><body>
+      <nav><h2>Menu principal</h2></nav>
       <h1 class="t1">Emergency</h1><h2 class="t3"><a href="/paramore/">Paramore</a></h2>
-      <div class="cifra_cnt"><pre>[Intro]
-<span class="tablatura"><span class="cnt">G|-------|
+      <div class="cifra_cnt"><pre>\u200B[Intro]
+<span class="tablatura"><span class="cnt">\u200BG|-------|
 D|-------|
 A|--3&amp;---|
 E|-0-----|</span></span></pre></div></body></html>`;

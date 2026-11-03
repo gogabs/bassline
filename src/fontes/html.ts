@@ -13,11 +13,16 @@ export function decodificar(texto: string): string {
 
 /** Remove as tags, mantendo quebras de linha de <br>. */
 export function textoSemTags(html: string): string {
-  return decodificar(html.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, ""));
+  return semInvisiveis(decodificar(html.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "")));
 }
 
 /** Conteúdo da tag <title>, sem o nome do site depois do traço. */
 export function tituloDaPagina(html: string): string | null {
   const m = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
   return m ? textoSemTags(m[1]!).trim() : null;
+}
+
+/** Remove caracteres invisíveis que alguns sites colocam no começo das linhas e atrapalham o parser. */
+export function semInvisiveis(texto: string): string {
+  return texto.replace(/[\u200B-\u200D\u2060\uFEFF]/g, "");
 }

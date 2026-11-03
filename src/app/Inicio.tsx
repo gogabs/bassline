@@ -1,6 +1,7 @@
 import { useRef, useState } from "preact/hooks";
 import { parseTab } from "../parser";
 import { pareceLink } from "../fontes";
+import { semInvisiveis } from "../fontes/html";
 import { apagarTab, listarTabs, salvarTab } from "./armazenamento";
 import type { Preferencias } from "./preferencias";
 
@@ -40,6 +41,8 @@ export function Inicio({ prefs }: { prefs: Preferencias }) {
       }
     }
 
+    // Texto copiado de sites pode trazer caracteres invisíveis no começo das linhas.
+    texto = semInvisiveis(texto);
     const song = parseTab(texto, { capitalP: prefs.pMaiusculo });
     const compassos = song.sections.reduce((n, s) => n + s.measures.length, 0);
     if (compassos === 0) return falhar("Não encontrei as linhas das cordas na tab, como as que começam com G, D, A e E.");
