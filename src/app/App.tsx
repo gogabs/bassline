@@ -77,5 +77,5 @@ function TelaTab({ id, prefs, onPrefs }: { id: string; prefs: Preferencias; onPr
         </p>
       </>
     );
-  return <TabView titulo={tab.titulo} fonteUrl={tab.fonteUrl} song={song} prefs={prefs} onPrefs={onPrefs} />;
+  return <TabView id={id} titulo={tab.titulo} fonteUrl={tab.fonteUrl} song={song} prefs={prefs} onPrefs={onPrefs} />;
 }

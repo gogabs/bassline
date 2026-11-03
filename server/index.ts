@@ -10,6 +10,7 @@ import { createServer, type ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fonteDoLink, listarFontes } from "../src/fontes";
+import { baixarDoYoutube, buscarNoYoutube, servirModelo } from "./backing";
 
 const PORTA = Number(process.env.PORT ?? 8787);
 const DIST = join(import.meta.dirname, "..", "dist");
@@ -20,6 +21,8 @@ const TIPOS: Record<string, string> = {
   ".svg": "image/svg+xml",
   ".json": "application/json",
   ".webmanifest": "application/manifest+json",
+  ".wasm": "application/wasm",
+  ".mjs": "text/javascript; charset=utf-8",
 };
 
 function json(res: ServerResponse, status: number, corpo: unknown) {
@@ -74,6 +77,12 @@ async function servirArquivo(caminho: string, res: ServerResponse) {
 
 createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://localhost");
+  // Isolamento de origem: deixa o navegador usar várias threads na separação do baixo.
+  res.setHeader("cross-origin-opener-policy", "same-origin");
+  res.setHeader("cross-origin-embedder-policy", "require-corp");
+  if (req.method === "GET" && url.pathname === "/api/youtube/busca") return void buscarNoYoutube(url.searchParams.get("q") ?? "", res);
+  if (req.method === "GET" && url.pathname === "/api/youtube/audio") return void baixarDoYoutube(url.searchParams.get("id") ?? "", res);
+  if (req.method === "GET" && url.pathname === "/api/modelo") return void servirModelo(req, res);
   if (url.pathname === "/api/tab" && req.method === "GET") {
     const link = url.searchParams.get("url");
     if (!link) return json(res, 400, { erro: "Faltou o link da tab." });

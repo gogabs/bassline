@@ -24,3 +24,5 @@ label { display: block; margin: 0.75rem 0 0.25rem; }
 .erro { border-left: 4px solid #c5221f; padding-left: 0.75rem; }
 .leitor { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 fieldset { border: 1px solid var(--borda); margin: 1rem 0; }
+.backing { border-top: 2px solid var(--borda); margin-top: 1rem; }
+progress { width: 12rem; }
