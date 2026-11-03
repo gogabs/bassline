@@ -53,6 +53,15 @@ interface TokenNote extends Note {
   column: number;
 }
 
+interface ReadRules {
+  capitalP: "pop" | "pull-off";
+  lowercaseP: "pop" | "pull-off";
+  /** A música tem casas de 10 a 15 escritas com dois dígitos, então casas de 16 a 24 são plausíveis. */
+  highFrets: boolean;
+  /** Chamado quando números grudados são lidos como casas separadas. */
+  onSplit: (run: string) => void;
+}
+
 export function parseTab(text: string, options: ParseOptions = {}): Song {
   const lines = cleanLines(text);
   const legend = readLegend(lines);
@@ -70,6 +79,8 @@ export function parseTab(text: string, options: ParseOptions = {}): Song {
   let measureNumber = 0;
   /** Comentários de um bloco que não rendeu compasso, guardados para o próximo. */
   let carriedComments: string[] = [];
+  const highFrets = hasMidRangeFrets(blocks);
+  const splitRuns = new Set<string>();
 
   for (const block of blocks) {
     const count = block.lines.length;
@@ -98,6 +109,8 @@ export function parseTab(text: string, options: ParseOptions = {}): Song {
     const result = parseBlock(block, lines, names, midiByLine, measureNumber, {
       capitalP,
       lowercaseP,
+      highFrets,
+      onSplit: (run) => splitRuns.add(run),
     });
     measureNumber += result.measures.length;
     unknownSymbols.push(...result.unknown);
@@ -114,6 +127,11 @@ export function parseTab(text: string, options: ParseOptions = {}): Song {
   const leftover = [...carriedComments, ...trailingComments];
   const lastMeasure = sections.flatMap((s) => s.measures).at(-1);
   if (lastMeasure && leftover.length > 0) lastMeasure.commentsAfter = leftover;
+  if (splitRuns.size > 0) {
+    warnings.push(
+      `Números grudados lidos como casas separadas: ${[...splitRuns].join(", ")}. Confira com a gravação.`,
+    );
+  }
 
   return {
     tuning: tuning ?? DEFAULT_TUNINGS[4]!,
@@ -394,7 +412,7 @@ function parseBlock(
   names: string[],
   midiByLine: (number | null)[],
   firstMeasureIndex: number,
-  pRules: { capitalP: "pop" | "pull-off"; lowercaseP: "pop" | "pull-off" },
+  pRules: ReadRules,
 ): BlockResult {
   const unknown: UnknownSymbol[] = [];
   const bodies = block.lines.map((l) => ({
@@ -509,7 +527,7 @@ function tokenizeString(
   name: string,
   stringNumber: number,
   openMidi: number | null,
-  pRules: { capitalP: "pop" | "pull-off"; lowercaseP: "pop" | "pull-off" },
+  pRules: ReadRules,
   reportUnknown: (symbol: string, column: number) => void,
 ): TokenNote[] {
   const notes: TokenNote[] = [];
@@ -587,9 +605,15 @@ function tokenizeString(
     }
 
     if (/\d/.test(ch)) {
-      const { value, length } = readFret(text, i);
-      makeNote(value, i, []);
-      i += length;
+      const run = /^\d+/.exec(text.slice(i))![0];
+      const frets = splitDigitRun(run, pRules.highFrets);
+      if (frets.length > 1 && run.length === frets.length) pRules.onSplit(run);
+      let col = i;
+      for (const f of frets) {
+        makeNote(f.value, col, []);
+        col += f.length;
+      }
+      i += run.length;
       continue;
     }
 
@@ -720,11 +744,48 @@ function tokenizeString(
   return notes;
 }
 
-/** Lê uma casa. Dois dígitos seguidos formam uma casa só quando o número é até 24. */
-function readFret(text: string, i: number): { value: number; length: number } {
-  const two = text.slice(i, i + 2);
-  if (/^\d\d$/.test(two) && Number(two) <= 24) return { value: Number(two), length: 2 };
-  return { value: Number(text[i]), length: 1 };
+/**
+ * Divide uma sequência de dígitos grudados em casas.
+ *
+ * Tabs de baixo costumam grudar notas, como "2222" para quatro notas na casa 2 ou "24" para casa 2 e
+ * depois 4. Regras:
+ * - Dígitos todos iguais (três ou mais) são notas separadas: "2222" vira 2, 2, 2, 2.
+ * - Dois dígitos de 10 a 15 são uma casa só.
+ * - Dois dígitos de 16 a 24 são uma casa só apenas quando a música usa casas de 10 a 15 em outro
+ *   lugar (highFrets). Senão, são duas casas: "24" vira 2 e 4.
+ * - Sequências mais longas são lidas da esquerda para a direita com as mesmas regras.
+ */
+export function splitDigitRun(run: string, highFrets: boolean): { value: number; length: number }[] {
+  if (run.length >= 3 && /^(\d)\1+$/.test(run)) {
+    return [...run].map((d) => ({ value: Number(d), length: 1 }));
+  }
+  const out: { value: number; length: number }[] = [];
+  let i = 0;
+  while (i < run.length) {
+    const two = run.slice(i, i + 2);
+    const value = Number(two);
+    if (two.length === 2 && run[i] !== "0" && value >= 10 && (value <= 15 || (highFrets && value <= 24))) {
+      out.push({ value, length: 2 });
+      i += 2;
+    } else {
+      out.push({ value: Number(run[i]), length: 1 });
+      i += 1;
+    }
+  }
+  return out;
+}
+
+/** A música tem alguma casa de 10 a 15 escrita como dois dígitos sozinhos? */
+function hasMidRangeFrets(blocks: Block[]): boolean {
+  for (const block of blocks) {
+    for (const line of block.lines) {
+      for (const m of line.raw.slice(line.bodyStart).matchAll(/(?<!\d)(\d\d)(?!\d)/g)) {
+        const v = Number(m[1]);
+        if (v >= 10 && v <= 15) return true;
+      }
+    }
+  }
+  return false;
 }
 
 // ---------------------------------------------------------------------------
