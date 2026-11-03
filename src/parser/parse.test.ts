@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseTab } from "./index";
+import { splitDigitRun } from "./parse";
 import type { Note, Song } from "./types";
 
 const notes = (song: Song, measure: number): Note[] =>
@@ -167,5 +168,45 @@ describe("parseTab", () => {
     );
     expect(notes(song, 1).map(short)).toEqual(["A3"]);
     expect(song.unknownSymbols).toEqual([{ symbol: "?", measureNumber: 1, string: "A", line: 5, column: 7 }]);
+  });
+
+  it("ignora caracteres invisíveis no começo das linhas, como os do Cifra Club", () => {
+    const z = "\u200B";
+    const song = parseTab([`${z}G|------|`, `${z}D|------|`, `${z}A|--3---|`, `${z}E|------|`].join("\n"));
+    expect(song.sections).toHaveLength(1);
+    expect(notes(song, 1).map(short)).toEqual(["A3"]);
+  });
+
+  it("separa números grudados quando a música não usa casas altas", () => {
+    const song = parseTab(
+      [
+        "G|-------------------------------------------------|",
+        "D|----24-4-4-4-4-4-2222---24-4-4-4-4-4-2222-0~---|",
+        "A|-------------------------------------------------|",
+        "E|-------------------------------------------------|",
+      ].join("\n"),
+    );
+    const d = notes(song, 1).map((n) => n.fret);
+    expect(d.slice(0, 11)).toEqual([2, 4, 4, 4, 4, 4, 4, 2, 2, 2, 2]);
+    expect(Math.max(...d.filter((f): f is number => f !== null))).toBe(4);
+    expect(song.warnings).toEqual([
+      "Números grudados lidos como casas separadas: 24, 2222. Confira com a gravação.",
+    ]);
+  });
+
+  it("lê 16 a 24 como uma casa só quando a música já usa casas de 10 a 15", () => {
+    const song = parseTab(["G|--12--17--|", "D|----------|", "A|----------|", "E|----------|"].join("\n"));
+    expect(notes(song, 1).map(short)).toEqual(["G12", "G17"]);
+    expect(song.warnings).toEqual([]);
+  });
+
+  it("divide sequências de dígitos com as regras de ambiguidade", () => {
+    const values = (run: string, high = false) => splitDigitRun(run, high).map((f) => f.value);
+    expect(values("2222")).toEqual([2, 2, 2, 2]);
+    expect(values("24")).toEqual([2, 4]);
+    expect(values("24", true)).toEqual([24]);
+    expect(values("12")).toEqual([12]);
+    expect(values("1012")).toEqual([10, 12]);
+    expect(values("05")).toEqual([0, 5]);
   });
 });
