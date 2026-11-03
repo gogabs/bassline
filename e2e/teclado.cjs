@@ -71,7 +71,7 @@ const ativo = (page) => page.evaluate(() => {
     await page.keyboard.press("ArrowRight");
     assert.deepEqual(await ativo(page), { tag: "LI", texto: "A3, hammer para 5" });
     await page.keyboard.press("ArrowRight");
-    await page.waitForFunction(() => document.querySelector(".leitor").textContent === "Fim do compasso");
+    await page.waitForFunction(() => document.querySelector("article.tab > .leitor").textContent === "Fim do compasso");
     await page.keyboard.press("ArrowDown");
     assert.deepEqual(await ativo(page), { tag: "H3", texto: "Compasso 2" });
     // Mudou de seção: o título fala a seção junto.

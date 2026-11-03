@@ -11,6 +11,7 @@
     "inicio": "npm run build && npm run servidor",
     "test": "vitest run",
     "test:e2e": "node e2e/teclado.cjs",
+    "test:backing": "node e2e/backing.cjs",
     "typecheck": "tsc --noEmit",
     "parse": "tsx scripts/parse.ts"
   },
@@ -24,6 +25,8 @@
     "vitest": "^2.1.8"
   },
   "dependencies": {
+    "demucs-web": "^1.0.2",
+    "onnxruntime-web": "^1.31.1",
     "preact": "^10.29.8"
   }
 }

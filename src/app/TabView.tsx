@@ -3,9 +3,12 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { Song } from "../parser";
 import { obterNarrador, type BlocoNarrado } from "../narrador";
 import { Tocador } from "./audio";
+import { BackingTrack } from "./BackingTrack";
 import type { Preferencias } from "./preferencias";
 
 interface Props {
+  /** Id da tab salva, para guardar a backing track. Sem id, a backing track não aparece. */
+  id?: string;
   titulo: string;
   fonteUrl: string | null;
   song: Song;
@@ -21,7 +24,7 @@ const CAMPOS = "button, a, input, select, textarea";
  * A tela da tab. Leitura e prática são a mesma coisa: no modo de navegação do NVDA, tudo
  * funciona com títulos, listas e botões; no modo de foco, as setas andam pela tab.
  */
-export function TabView({ titulo, fonteUrl, song, prefs, onPrefs, acoes }: Props) {
+export function TabView({ id, titulo, fonteUrl, song, prefs, onPrefs, acoes }: Props) {
   const narracao = useMemo(() => obterNarrador(prefs.narrador).narrar(song, prefs), [song, prefs]);
   const raiz = useRef<HTMLElement>(null);
   const tocador = useMemo(() => new Tocador(), []);
@@ -72,7 +75,7 @@ export function TabView({ titulo, fonteUrl, song, prefs, onPrefs, acoes }: Props
   function aoTeclar(e: KeyboardEvent) {
     const alvo = e.target as HTMLElement;
     if (e.altKey || e.metaKey || e.shiftKey) return;
-    if (alvo.closest("input, select, textarea")) return;
+    if (alvo.closest("input, select, textarea, [data-backing]")) return;
     const blocos = todos("[data-bloco]");
     const blocoAtual = alvo.closest<HTMLElement>("[data-bloco]");
     const i = blocoAtual ? blocos.indexOf(blocoAtual) : -1;
@@ -200,6 +203,8 @@ export function TabView({ titulo, fonteUrl, song, prefs, onPrefs, acoes }: Props
         </label>
         {acoes}
       </div>
+
+      {id && <BackingTrack tabId={id} titulo={titulo} />}
 
       {narracao.secoes.map((secao, i) => {
         const conteudo = secao.blocos.map((bloco, j) => {
