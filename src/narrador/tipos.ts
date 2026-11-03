@@ -68,6 +68,10 @@ export interface BlocoNarrado {
   rotuloTocar: string;
   /** Compassos que este bloco representa, em ordem. O primeiro é o que toca. */
   compassos: Measure[];
+  /** Comentários que a tab escreveu antes deste bloco, já prontos para ler. */
+  comentarios: string[];
+  /** Comentários que a tab escreveu depois do último bloco. */
+  comentariosDepois: string[];
   itens: ItemNarrado[];
 }
 

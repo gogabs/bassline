@@ -96,6 +96,29 @@ const ativo = (page) => page.evaluate(() => {
     await page.selectOption("select", "nome");
     assert.equal(await page.textContent("li[data-item]"), "Sol, 4 vezes");
 
+    // Tab do Cifra Club com caracteres invisíveis no começo das linhas e comentários.
+    const suja = readFileSync(join(__dirname, "..", "src", "parser", "exemplos", "cifraclub-comentarios.txt"), "utf8")
+      .split("\n")
+      .map((l) => (l ? "\u00a0\u200b" + l : l))
+      .join("\n");
+    await page.goto(BASE);
+    await page.fill("#entrada", suja);
+    await page.fill("#nome", "Tab com comentários");
+    await page.click("button[type=submit]");
+    await page.waitForSelector("h1:has-text('Tab com comentários')");
+    assert.deepEqual(await page.$$eval("h2", (hs) => hs.map((h) => h.textContent)), ["Introdução verso e refrões", "Ponte"]);
+    assert.equal(
+      await page.textContent("[data-bloco='0-1'] .comentario"),
+      "Comentário: seria bom variar as vezes",
+    );
+    await axe(page, "Tab com comentários");
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("ArrowDown");
+    assert.deepEqual(await ativo(page), {
+      tag: "H3",
+      texto: "Compasso 2, comentário: seria bom variar as vezes",
+    });
+
     await page.click("a[href='#/config']");
     await page.waitForSelector("h1:has-text('Configurações')");
     await axe(page, "Configurações");

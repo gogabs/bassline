@@ -24,6 +24,8 @@ O parser já entende:
 
 - Baixo de 4, 5 e 6 cordas, afinações nomeadas nas linhas da tab ou numa linha "Afinação:" no topo.
 - Compassos separados por barras, seções com rótulo (como `[Intro]` ou `Refrão:`) e repetições (`x4`, `(x2)`, `|: ... :|`).
+- Comentários de texto livre no meio da tab (como "seria bom variar às vezes"), guardados no compasso seguinte.
+- Sujeira de tabs copiadas de sites: espaços não separáveis, BOM, caracteres de largura zero e recuos diferentes no começo das linhas.
 - Casas de um e dois dígitos e notas tocadas juntas.
 - Hammer-on (h), pull-off (p), slide (/, \ e s, inclusive slide de entrada e de saída), bend (b) e release (r) com alvo, vibrato (~), ghost note ((5)), nota morta (x), harmônico natural (<12>, [12], 12*) e artificial (AH, PH), slap (T, S), pop (P), tapping (t) e palm mute (PM na linha de anotação).
 - A legenda da tab, quando ela diz que P maiúsculo é pull-off.
@@ -40,7 +42,7 @@ A interface fica em `src/app`, feita com Preact. Leitura e prática são a mesma
 
 No modo de foco do NVDA:
 
-- Baixo e Cima vão para o próximo e o anterior compasso. Se a seção mudar, o app fala a seção junto.
+- Baixo e Cima vão para o próximo e o anterior compasso. Se a seção mudar, o app fala a seção junto. Se a tab tiver um comentário antes do compasso, o app fala o comentário junto.
 - Ctrl mais Baixo e Ctrl mais Cima vão para a próxima e a anterior seção.
 - Direita e Esquerda andam pelos símbolos do compasso.
 - Enter toca o compasso, e Escape para o som.

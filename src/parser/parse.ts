@@ -45,6 +45,8 @@ interface Block {
   repeatTimes: number | null;
   /** Rótulo de seção encontrado entre o bloco anterior e este. */
   label: string | null;
+  /** Comentários de texto livre entre o bloco anterior e este. */
+  comments: string[];
 }
 
 interface TokenNote extends Note {
@@ -52,12 +54,12 @@ interface TokenNote extends Note {
 }
 
 export function parseTab(text: string, options: ParseOptions = {}): Song {
-  const lines = text.split(/\r?\n/);
+  const lines = cleanLines(text);
   const legend = readLegend(lines);
   const capitalP = legend.capitalP ?? options.capitalP ?? "pop";
   const lowercaseP = legend.lowercaseP ?? "pull-off";
 
-  const blocks = findBlocks(lines);
+  const { blocks, trailingComments } = findBlocks(lines);
   const warnings: string[] = [];
   const unknownSymbols: UnknownSymbol[] = [];
   const sections: Section[] = [];
@@ -66,6 +68,8 @@ export function parseTab(text: string, options: ParseOptions = {}): Song {
   let tuning: string[] | null = null;
   let stringCount = 0;
   let measureNumber = 0;
+  /** Comentários de um bloco que não rendeu compasso, guardados para o próximo. */
+  let carriedComments: string[] = [];
 
   for (const block of blocks) {
     const count = block.lines.length;
@@ -97,8 +101,19 @@ export function parseTab(text: string, options: ParseOptions = {}): Song {
     });
     measureNumber += result.measures.length;
     unknownSymbols.push(...result.unknown);
+    const comments = [...carriedComments, ...block.comments];
+    if (result.measures.length > 0) {
+      if (comments.length > 0) result.measures[0]!.comments = comments;
+      carriedComments = [];
+    } else {
+      carriedComments = comments;
+    }
     section.measures.push(...result.measures);
   }
+
+  const leftover = [...carriedComments, ...trailingComments];
+  const lastMeasure = sections.flatMap((s) => s.measures).at(-1);
+  if (lastMeasure && leftover.length > 0) lastMeasure.commentsAfter = leftover;
 
   return {
     tuning: tuning ?? DEFAULT_TUNINGS[4]!,
@@ -110,7 +125,34 @@ export function parseTab(text: string, options: ParseOptions = {}): Song {
 }
 
 // ---------------------------------------------------------------------------
-// Encontrar blocos de cordas, rótulos e repetições
+// Limpeza do texto
+// ---------------------------------------------------------------------------
+
+/**
+ * Caracteres invisíveis que aparecem quando se copia uma tab de um site (Cifra Club, por
+ * exemplo): BOM, espaço de largura zero, marcas de direção do texto e caracteres de
+ * controle. Eles não ocupam coluna na tela, então são removidos.
+ */
+const INVISIBLE = /[\p{Cf}\u0000-\u0008\u000B-\u001F\u007F-\u009F]/gu;
+
+/** Espaços e símbolos estranhos que podem vir antes do nome da corda. */
+const LEADING_JUNK = /^[\p{Zs}\p{Co}\uFFFD\t]*/u;
+
+/**
+ * Separa o texto em linhas e limpa cada uma: tira caracteres invisíveis, tira espaços
+ * especiais (como o espaço não separável) e símbolos estranhos do começo da linha,
+ * e troca espaços especiais do meio da linha por espaços comuns, mantendo as colunas.
+ */
+export function cleanLines(text: string): string[] {
+  return text.split(/\r\n|\r|\n/).map((raw) => {
+    let line = raw.replace(INVISIBLE, "");
+    line = line.replace(LEADING_JUNK, (lead) => lead.replace(/[^ ]/g, ""));
+    return line.replace(/\p{Zs}/gu, " ").replace(/\t/g, " ").trimEnd();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Encontrar blocos de cordas, rótulos, comentários e repetições
 // ---------------------------------------------------------------------------
 
 const TAB_CHARS = /[-0-9|hHpPbrsStTx~/\\()<>[\]*.:AHvX ]/;
@@ -158,10 +200,32 @@ function sectionLabel(raw: string): string | null {
   if (/^(tuning|afina[cç][aã]o|capo|tom|key|bpm|tempo)\b/i.test(line)) return null;
   const bracket = /^\[([^\]]{1,40})\]$/.exec(line);
   if (bracket) return bracket[1]!.trim();
-  if (line.length <= 40 && SECTION_KEYWORDS.test(line)) return line.replace(/[:\s]+$/, "");
+  // Frases (com vírgula ou ponto final) são comentários, mesmo começando com "fim" ou "solo".
+  if (line.length <= 40 && SECTION_KEYWORDS.test(line) && !/[,;]|\.$/.test(line)) return line.replace(/[:\s]+$/, "");
   const colon = /^([^|\-:]{1,30}):$/.exec(line);
   if (colon) return colon[1]!.trim();
   return null;
+}
+
+/** Linha que só tem cifras, como "Am   G   F". */
+function isChordLine(raw: string): boolean {
+  const tokens = raw.trim().split(/\s+/);
+  return tokens.every((t) => /^[A-G][#b]?(m|maj|min|dim|aug|sus|add|M)?\d*(\/[A-G][#b]?)?$/.test(t));
+}
+
+/** Linha de configuração já lida em outro lugar (afinação, legenda de P). */
+function isMetaLine(raw: string): boolean {
+  return /^\s*(tuning|afina[cç][aã]o)\s*[:\-]/i.test(raw) || /(?:^|\s)[Pp]\s*[=:\-]+\s*(pull|pop)/i.test(raw);
+}
+
+/** Linha de texto livre que vale guardar como comentário. */
+function isCommentLine(raw: string): boolean {
+  const letters = raw.match(/\p{L}/gu)?.length ?? 0;
+  return letters >= 2 && !isChordLine(raw) && !isMetaLine(raw);
+}
+
+function indentOf(raw: string): number {
+  return /^ */.exec(raw)![0].length;
 }
 
 function isAnnotationLine(raw: string): boolean {
@@ -170,19 +234,44 @@ function isAnnotationLine(raw: string): boolean {
   return /[TPS]/.test(raw);
 }
 
-function findBlocks(lines: string[]): Block[] {
+/**
+ * Acha os blocos de cordas. Modifica `lines` quando as linhas de um bloco começam em
+ * colunas diferentes, para alinhá-las.
+ */
+function findBlocks(lines: string[]): { blocks: Block[]; trailingComments: string[] } {
   const blocks: Block[] = [];
   let i = 0;
   let pendingLabel: string | null = null;
+  let pendingComments: string[] = [];
+  /** Linhas seguidas de texto, que juntas formam um comentário. */
+  let paragraph: string[] = [];
+  /** Linhas já usadas por um bloco (anotação abaixo, "x4"), que não são comentário. */
+  const consumed = new Set<number>();
+  const flush = () => {
+    if (paragraph.length > 0) pendingComments.push(paragraph.join(" "));
+    paragraph = [];
+  };
+
   while (i < lines.length) {
     const first = readStringLine(lines[i]!, i);
     if (!first) {
-      const label = sectionLabel(lines[i]!);
-      if (label !== null && !isAnnotationLine(lines[i]!)) pendingLabel = label;
+      const raw = lines[i]!;
+      if (consumed.has(i) || isAnnotationLine(raw) || repeatLine(raw) !== null) {
+        flush();
+      } else if (!raw.trim()) {
+        flush();
+      } else if (sectionLabel(raw) !== null) {
+        flush();
+        pendingLabel = sectionLabel(raw);
+      } else if (isCommentLine(raw)) {
+        paragraph.push(raw.trim());
+      } else {
+        flush();
+      }
       i++;
       continue;
     }
-    const group: StringLine[] = [first];
+    let group: StringLine[] = [first];
     let j = i + 1;
     while (j < lines.length) {
       const next = readStringLine(lines[j]!, j);
@@ -191,9 +280,25 @@ function findBlocks(lines: string[]): Block[] {
       j++;
     }
     if (group.length < 4 || group.length > 6) {
+      flush();
       i = j;
       continue;
     }
+    // Linhas do mesmo bloco com recuos diferentes: alinha todas na coluna 0.
+    const indents = group.map((l) => indentOf(l.raw));
+    if (new Set(indents).size > 1) {
+      const shift = Math.min(...indents);
+      group = group.map((l) => {
+        lines[l.lineIndex] = l.raw.trimStart();
+        return readStringLine(lines[l.lineIndex]!, l.lineIndex)!;
+      });
+      for (const k of [i - 1, j]) {
+        if (k >= 0 && k < lines.length && isAnnotationLine(lines[k]!)) {
+          lines[k] = lines[k]!.slice(Math.min(shift, indentOf(lines[k]!)));
+        }
+      }
+    }
+    flush();
     const above = i - 1 >= 0 && isAnnotationLine(lines[i - 1]!) ? i - 1 : null;
     const below = j < lines.length && isAnnotationLine(lines[j]!) ? j : null;
     let repeatTimes: number | null = null;
@@ -202,18 +307,27 @@ function findBlocks(lines: string[]): Block[] {
       if (r !== null) repeatTimes = r;
     }
     const after = below !== null ? below + 1 : j;
-    if (repeatTimes === null && after < lines.length) repeatTimes = repeatLine(lines[after]!);
+    if (repeatTimes === null && after < lines.length) {
+      repeatTimes = repeatLine(lines[after]!);
+      if (repeatTimes !== null) consumed.add(after);
+    }
+    if (below !== null) consumed.add(below);
     blocks.push({
       lines: group,
       annotationAbove: above,
       annotationBelow: below,
       repeatTimes,
       label: pendingLabel,
+      comments: pendingComments,
     });
     pendingLabel = null;
+    pendingComments = [];
     i = j;
   }
-  return blocks;
+  flush();
+  // Um "rótulo" sem bloco depois era, na verdade, um comentário final.
+  if (pendingLabel !== null) pendingComments.push(pendingLabel);
+  return { blocks, trailingComments: pendingComments };
 }
 
 // ---------------------------------------------------------------------------
