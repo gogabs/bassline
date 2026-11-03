@@ -58,13 +58,16 @@ export function TabView({ titulo, fonteUrl, song, prefs, onPrefs, acoes }: Props
 
   function focarBloco(bloco: HTMLElement, mudouSecao: boolean) {
     const titulo = bloco.querySelector<HTMLElement>("h3")!;
-    if (mudouSecao) {
-      const secao = bloco.closest<HTMLElement>("[data-secao]")?.dataset.titulo;
-      // Por um instante, o título do compasso também diz a seção, e o NVDA fala as duas coisas juntas.
-      if (secao) {
-        titulo.setAttribute("aria-label", `${secao}, ${titulo.textContent}`);
-        titulo.addEventListener("blur", () => titulo.removeAttribute("aria-label"), { once: true });
-      }
+    // Por um instante, o título do compasso também diz a seção (se mudou) e o comentário
+    // da tab (se houver), e o NVDA fala tudo junto.
+    const partes: string[] = [];
+    const secao = mudouSecao ? bloco.closest<HTMLElement>("[data-secao]")?.dataset.titulo : undefined;
+    if (secao) partes.push(secao);
+    partes.push(titulo.textContent ?? "");
+    if (bloco.dataset.comentario) partes.push(`comentário: ${bloco.dataset.comentario}`);
+    if (partes.length > 1) {
+      titulo.setAttribute("aria-label", partes.join(", "));
+      titulo.addEventListener("blur", () => titulo.removeAttribute("aria-label"), { once: true });
     }
     titulo.focus();
   }
@@ -205,10 +208,21 @@ export function TabView({ titulo, fonteUrl, song, prefs, onPrefs, acoes }: Props
         const conteudo = secao.blocos.map((bloco, j) => {
           const chave = `${i}-${j}`;
           return (
-            <div key={chave} class="bloco" data-bloco={chave} data-compassos={bloco.compassos.map((c) => c.number).join(" ")}>
+            <div
+              key={chave}
+              class="bloco"
+              data-bloco={chave}
+              data-compassos={bloco.compassos.map((c) => c.number).join(" ")}
+              data-comentario={bloco.comentarios.join(". ") || undefined}
+            >
               <h3 tabIndex={-1} id={`compasso-${bloco.compassos[0]!.number}`}>
                 {bloco.titulo}
               </h3>
+              {bloco.comentarios.map((c, k) => (
+                <p key={k} class="comentario">
+                  Comentário: {c}
+                </p>
+              ))}
               <button type="button" onClick={() => void tocar(chave)}>
                 {tocando === chave ? "Parar" : bloco.rotuloTocar}
               </button>
@@ -221,6 +235,11 @@ export function TabView({ titulo, fonteUrl, song, prefs, onPrefs, acoes }: Props
                   ))}
                 </ol>
               )}
+              {bloco.comentariosDepois.map((c, k) => (
+                <p key={k} class="comentario">
+                  Comentário no fim da tab: {c}
+                </p>
+              ))}
             </div>
           );
         });

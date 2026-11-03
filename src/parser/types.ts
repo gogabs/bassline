@@ -68,6 +68,13 @@ export interface Measure {
   repeatStart?: boolean;
   /** Último compasso de um trecho que se repete, com quantas vezes ele é tocado no total. */
   repeatEnd?: { times: number | null };
+  /**
+   * Comentários de texto livre que aparecem na tab logo antes deste compasso, como
+   * "seria bom variar às vezes". Linhas seguidas de texto viram um comentário só.
+   */
+  comments?: string[];
+  /** Comentários que aparecem depois deste compasso, quando ele é o último da tab. */
+  commentsAfter?: string[];
 }
 
 export interface Section {

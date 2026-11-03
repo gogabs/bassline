@@ -133,6 +133,8 @@ function blocos(secao: Section, song: Song, opcoes: OpcoesNarracao): BlocoNarrad
       opcoes.juntarCompassos &&
       anterior !== undefined &&
       m.events.length > 0 &&
+      !m.comments?.length &&
+      !anterior.commentsAfter?.length &&
       !m.repeatStart &&
       !anterior.repeatEnd &&
       assinaturaCompasso(anterior) === assinaturaCompasso(m);
@@ -155,6 +157,8 @@ function blocos(secao: Section, song: Song, opcoes: OpcoesNarracao): BlocoNarrad
       titulo,
       rotuloTocar: `Tocar compasso ${primeiro.number}`,
       compassos,
+      comentarios: primeiro.comments ?? [],
+      comentariosDepois: ultimo.commentsAfter ?? [],
       itens: itensDoCompasso(primeiro, song, opcoes),
     };
   });

@@ -74,3 +74,14 @@ describe("narrador em português", () => {
     expect(obterNarrador("nao-existe").id).toBe("pt-br");
   });
 });
+
+describe("comentários da tab", () => {
+  it("põe o comentário no bloco seguinte e não junta compassos separados por comentário", () => {
+    const tab = ["G|----|", "D|----|", "A|-3--|", "E|----|", "toque mais leve aqui", "G|----|", "D|----|", "A|-3--|", "E|----|", "", "fim, repete 2 vezes"];
+    const blocos = narrar(tab).secoes[0]!.blocos;
+    expect(blocos.map((b) => b.titulo)).toEqual(["Compasso 1", "Compasso 2"]);
+    expect(blocos[0]!.comentarios).toEqual([]);
+    expect(blocos[1]!.comentarios).toEqual(["toque mais leve aqui"]);
+    expect(blocos[1]!.comentariosDepois).toEqual(["fim, repete 2 vezes"]);
+  });
+});
