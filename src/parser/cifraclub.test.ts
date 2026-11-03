@@ -46,14 +46,14 @@ describe("tabs do Cifra Club", () => {
     ["espaço largo", " "],
     ["caractere de substituição", "�"],
   ])("ignora %s no começo das linhas", (_nome, sujeira) => {
-    const suja = EXEMPLO.split("\n")
+    const suja = EXEMPLO.split(/\r?\n/)
       .map((l) => (l ? sujeira + l : l))
       .join("\r\n");
     expect(resumo(parseTab(suja))).toEqual(resumo(limpa));
   });
 
   it("ignora sujeira só em algumas linhas do bloco", () => {
-    const suja = EXEMPLO.split("\n")
+    const suja = EXEMPLO.split(/\r?\n/)
       .map((l, i) => (i % 2 === 0 && l ? " " + l : l))
       .join("\n");
     expect(resumo(parseTab(suja))).toEqual(resumo(limpa));
